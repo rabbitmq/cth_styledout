@@ -1,0 +1,7 @@
+.sw?
+.*.sw?
+/cth_styledout.d
+/.cth_styledout.plt
+/.erlang.mk/
+/ebin/
+/logs/
