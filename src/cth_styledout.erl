@@ -48,6 +48,7 @@
 -record(suite, {
           name,
           line,
+          init_end_return,
           pre_init_time,
           post_init_time,
           pre_end_time,
@@ -58,7 +59,12 @@
           path,
           name,
           line,
-          total_runs = 1
+          init_end_return,
+          total_runs = 1,
+          pre_init_time,
+          post_init_time,
+          pre_end_time,
+          post_end_time
          }).
 
 -record(test, {
@@ -250,22 +256,39 @@ handle_cast({pre_init_per_suite, SuiteName, Config, Timestamp}, State)
     State1 = insert_node(Suite, State),
     {noreply, State1};
 
-handle_cast({post_init_per_suite, SuiteName, _Config, _Return, Timestamp},
+handle_cast({post_init_per_suite, SuiteName, _Config, Return, Timestamp},
             State) ->
     Suite = get_node(SuiteName, State),
-    Suite1 = Suite#suite{post_init_time = Timestamp},
+    Suite1 = Suite#suite{
+               init_end_return = case return_to_result(Return) of
+                                     success -> undefined;
+                                     _       -> Return
+                                 end,
+               post_init_time = Timestamp
+              },
     State1 = replace_node(Suite1, State),
     {noreply, State1};
 
-%% pre_end_per_suite.
-%% .
+handle_cast({pre_end_per_suite, SuiteName, _Config, Timestamp}, State) ->
+    Suite = get_node(SuiteName, State),
+    Suite1 = Suite#suite{
+               pre_end_time = Timestamp
+              },
+    State1 = replace_node(Suite1, State),
+    {noreply, State1};
 
-handle_cast({post_end_per_suite, SuiteName, _Config, _Return, Timestamp},
+handle_cast({post_end_per_suite, SuiteName, _Config, Return, Timestamp},
             State) ->
     Suite = get_node(SuiteName, State),
-    Suite1 = Suite#suite{post_end_time = Timestamp},
+    Suite1 = Suite#suite{
+               init_end_return = case return_to_result(Return) of
+                                     success -> undefined;
+                                     _       -> Return
+                                 end,
+               post_end_time = Timestamp
+              },
     State1 = replace_node(Suite1, State),
-    show_suite_summary(Suite, State),
+    show_suite_summary(Suite1, State1),
     {noreply, State1};
 
 handle_cast({pre_init_per_group, GroupName, Config, _}, State)
@@ -284,9 +307,39 @@ handle_cast({pre_init_per_group, GroupName, Config, _}, State)
              end,
     {noreply, State1};
 
-%% post_init_per_group.
-%% pre_end_per_group.
-%% post_end_per_group.
+handle_cast({post_init_per_group, GroupName, _Config, Return, Timestamp},
+            State) ->
+    Group = get_node(GroupName, State),
+    Group1 = Group#group{
+               init_end_return = case return_to_result(Return) of
+                                     success -> undefined;
+                                     _       -> Return
+                                 end,
+               post_init_time = Timestamp
+              },
+    State1 = replace_node(Group1, State),
+    {noreply, State1};
+
+handle_cast({pre_end_per_group, GroupName, _Config, Timestamp}, State) ->
+    Group = get_node(GroupName, State),
+    Group1 = Group#group{
+               pre_end_time = Timestamp
+              },
+    State1 = replace_node(Group1, State),
+    {noreply, State1};
+
+handle_cast({post_end_per_group, GroupName, _Config, Return, Timestamp},
+            State) ->
+    Group = get_node(GroupName, State),
+    Group1 = Group#group{
+               init_end_return = case return_to_result(Return) of
+                                     success -> undefined;
+                                     _       -> Return
+                                 end,
+               post_end_time = Timestamp
+              },
+    State1 = replace_node(Group1, State),
+    {noreply, State1};
 
 handle_cast({pre_init_per_testcase, TestcaseName, Config, Timestamp}, State)
   when is_list(Config) ->
@@ -311,15 +364,58 @@ handle_cast({pre_init_per_testcase, TestcaseName, Config, Timestamp}, State)
              end,
     {noreply, State1};
 
+handle_cast({post_init_per_testcase, TestcaseName, Config, Return, Timestamp},
+            State) ->
+    {RunIdx, _, TestPath} = compute_test_run_path(
+                              TestcaseName, Config, State),
+    Test = get_node(TestPath, State),
+    Run = lists:keyfind(RunIdx, #run.index, Test#test.runs),
+    Result = return_to_result(Return),
+    Run1 = Run#run{
+             result = Result,
+             return = case Result of
+                          success -> undefined;
+                          _       -> Return
+                      end,
+             post_init_time = Timestamp
+            },
+    Test1 = Test#test{
+              result = update_test_result(Test#test.result, Run1#run.result,
+                                         all_runs_in_progress(Test)),
+              runs = lists:keyreplace(RunIdx, #run.index, Test#test.runs,
+                                      Run1)
+             },
+    State1 = replace_node(Test1, State),
+    {noreply, State1};
+
+handle_cast({pre_end_per_testcase, TestcaseName, Config, Timestamp}, State) ->
+    {RunIdx, _, TestPath} = compute_test_run_path(
+                              TestcaseName, Config, State),
+    Test = get_node(TestPath, State),
+    Run = lists:keyfind(RunIdx, #run.index, Test#test.runs),
+    Run1 = Run#run{
+             pre_end_time = Timestamp
+            },
+    Test1 = Test#test{
+              runs = lists:keyreplace(RunIdx, #run.index, Test#test.runs,
+                                      Run1)
+             },
+    State1 = replace_node(Test1, State),
+    {noreply, State1};
+
 handle_cast({post_end_per_testcase, TestcaseName, Config, Return, Timestamp},
             State) ->
     {RunIdx, _, TestPath} = compute_test_run_path(
                               TestcaseName, Config, State),
     Test = get_node(TestPath, State),
     Run = lists:keyfind(RunIdx, #run.index, Test#test.runs),
+    Result = return_to_result(Return),
     Run1 = Run#run{
-             return = Return,
-             result = return_to_result(Return),
+             result = Result,
+             return = case Result of
+                          success -> undefined;
+                          _       -> Return
+                      end,
              post_end_time = Timestamp
             },
     Test1 = Test#test{
@@ -737,12 +833,14 @@ test_runs_duration_avg(Runs) ->
             format_duration(Duration)
     end.
 
-return_to_result({error, _}) -> failure;
-return_to_result({skip, _})  -> skipped;
-return_to_result(_)          -> success.
+return_to_result({'EXIT', _}) -> failure;
+return_to_result({error, _})  -> failure;
+return_to_result({failed, _}) -> failure;
+return_to_result({skip, _})   -> skipped;
+return_to_result(_)           -> success.
 
 result_to_color(success)   -> "\e[32m";
-result_to_color(skipped)   -> "\e[33m";
+result_to_color(skipped)   -> "\e[1;33m";
 result_to_color(failure)   -> "\e[1;31m";
 result_to_color(undefined) -> "\e[0m".
 
@@ -841,24 +939,38 @@ show_suite_summary(_Suite, _State) ->
     io:format("~n", []).
 
 show_final_report(#state{nodes = Nodes}) ->
-    show_test_errors(Nodes),
+    show_errors(Nodes),
     io:format("~n", []).
 
-show_test_errors([#test{result = failure} = Test | Rest]) ->
+show_errors([#suite{init_end_return = Return}  = Suite | Rest])
+  when Return =/= undefined ->
+    Label = path_to_error_label(Suite),
+    Color = result_to_color(return_to_result(Return)),
+    io:format("~n~s~s\e[0m~n    ~p~n", [Color, Label, Return]),
+    show_errors(Rest);
+show_errors([#group{init_end_return = Return} = Group | Rest])
+  when Return =/= undefined ->
+    Label = path_to_error_label(Group),
+    Color = result_to_color(return_to_result(Return)),
+    io:format("~n~s~s\e[0m~n    ~p~n", [Color, Label, Return]),
+    show_errors(Rest);
+show_errors([#test{result = Result} = Test | Rest]) when Result =/= success ->
     show_run_errors(Test),
-    show_test_errors(Rest);
-show_test_errors([_ | Rest]) ->
-    show_test_errors(Rest);
-show_test_errors([]) ->
+    show_errors(Rest);
+show_errors([_ | Rest]) ->
+    show_errors(Rest);
+show_errors([]) ->
     ok.
 
-show_run_errors(#test{path = Path, runs = Runs}) ->
-    Label = string:join([atom_to_list(A) || A <- lists:reverse(Path)], " > "),
-    io:format("~n\e[1;31m~s\e[0m~n", [Label]),
+show_run_errors(#test{runs = Runs, result = Result} = Test) ->
+    Label = path_to_error_label(Test),
+    Color = result_to_color(Result),
+    io:format("~n~s~s\e[0m~n", [Color, Label]),
     show_run_errors1(Runs, []).
 
 show_run_errors1(
-  [#run{result = failure, return = Return} | Rest], Displayed) ->
+  [#run{result = Result, return = Return} | Rest], Displayed)
+  when Result =/= success ->
     case lists:member(Return, Displayed) of
         false ->
             io:format("    #~b. ~p~n", [length(Displayed) + 1, Return]),
@@ -870,6 +982,15 @@ show_run_errors1([_ | Rest], Displayed) ->
     show_run_errors1(Rest, Displayed);
 show_run_errors1([], _) ->
     ok.
+
+path_to_error_label(Node) ->
+    Path = get_path(Node),
+    path_to_error_label1(Path).
+
+path_to_error_label1(Path) when is_list(Path) ->
+    string:join([atom_to_list(A) || A <- lists:reverse(Path)], " > ");
+path_to_error_label1(Name) when is_atom(Name) ->
+    atom_to_list(Name).
 
 flush_io_requests() ->
     receive
