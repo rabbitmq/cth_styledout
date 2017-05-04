@@ -528,14 +528,24 @@ compute_group_path(GroupName, Config, State) ->
 compute_test_run_path(TestcaseName, Config, State) ->
     ConfigPath = ?config(tc_group_path, Config),
     ConfigProps = ?config(tc_group_properties, Config),
-    ParentPath0 = [format_test_component(Component)
-                   || Component <- [ConfigProps | ConfigPath]],
+    ParentPath0 = format_test_components([ConfigProps | ConfigPath]),
     ParentPath = fix_path(ParentPath0, State),
     Path = [TestcaseName | ParentPath],
     TotalRuns = get_repeat(ConfigProps),
     RunIdx = compute_run_index([ConfigProps | ConfigPath],
                                get_node(ParentPath, State)),
     {RunIdx, TotalRuns, Path}.
+
+format_test_components(Components) ->
+    format_test_components1(Components, []).
+
+format_test_components1([Component | Rest], Path) ->
+    case format_test_component(Component) of
+        undefined -> format_test_components1(Rest, Path);
+        Name      -> format_test_components1(Rest, [Name | Path])
+    end;
+format_test_components1([], Path) ->
+    lists:reverse(Path).
 
 format_test_component(Component) ->
     case proplists:get_value(suite, Component) of
