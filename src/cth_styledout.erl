@@ -232,6 +232,7 @@ stop_server(Server) ->
     gen_server:cast(Server, stop).
 
 init([]) ->
+    start_watchdog(),
     _ = turn_off_error_logger_tty_h(),
     State = #state{},
     {ok, State}.
@@ -475,6 +476,21 @@ stop_initial_ct_group_leader() ->
 
 turn_off_error_logger_tty_h() ->
     error_logger:delete_report_handler(error_logger_tty_h).
+
+start_watchdog() ->
+    Server = self(),
+    spawn_link(fun() -> watchdog(Server) end).
+
+watchdog(Server) ->
+    process_flag(trap_exit, true),
+    receive
+        {'EXIT', Server, normal} ->
+            ok;
+        {'EXIT', Server, Reason} ->
+            io:format(standard_error,
+                      "\e[1;31m/!\\ ~s crashed:\e[0m~n~p~n~n",
+                      [?MODULE, Reason])
+    end.
 
 %% -------------------------------------------------------------------
 
