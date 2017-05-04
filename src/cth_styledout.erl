@@ -308,9 +308,10 @@ handle_cast({pre_init_per_group, GroupName, Config, _}, State)
              end,
     {noreply, State1};
 
-handle_cast({post_init_per_group, GroupName, _Config, Return, Timestamp},
+handle_cast({post_init_per_group, GroupName, Config, Return, Timestamp},
             State) ->
-    Group = get_node(GroupName, State),
+    {_, GroupPath} = compute_group_path(GroupName, Config, State),
+    Group = get_node(GroupPath, State),
     Group1 = Group#group{
                init_end_return = case return_to_result(Return) of
                                      success -> undefined;
@@ -321,17 +322,19 @@ handle_cast({post_init_per_group, GroupName, _Config, Return, Timestamp},
     State1 = replace_node(Group1, State),
     {noreply, State1};
 
-handle_cast({pre_end_per_group, GroupName, _Config, Timestamp}, State) ->
-    Group = get_node(GroupName, State),
+handle_cast({pre_end_per_group, GroupName, Config, Timestamp}, State) ->
+    {_, GroupPath} = compute_group_path(GroupName, Config, State),
+    Group = get_node(GroupPath, State),
     Group1 = Group#group{
                pre_end_time = Timestamp
               },
     State1 = replace_node(Group1, State),
     {noreply, State1};
 
-handle_cast({post_end_per_group, GroupName, _Config, Return, Timestamp},
+handle_cast({post_end_per_group, GroupName, Config, Return, Timestamp},
             State) ->
-    Group = get_node(GroupName, State),
+    {_, GroupPath} = compute_group_path(GroupName, Config, State),
+    Group = get_node(GroupPath, State),
     Group1 = Group#group{
                init_end_return = case return_to_result(Return) of
                                      success -> undefined;
@@ -684,11 +687,11 @@ replace_node(#test{path = Path} = Node, #state{nodes = Nodes} = State) ->
     State1 = State#state{nodes = Nodes1},
     update_node_status_line(Node, State1),
     State1;
-%replace_node(#group{path = Path} = Node, #state{nodes = Nodes} = State) ->
-%    Nodes1 = lists:keyreplace(Path, #group.path, Nodes, Node),
-%    State1 = State#state{nodes = Nodes1},
-%    update_node_status_line(Node, State1),
-%    State1;
+replace_node(#group{path = Path} = Node, #state{nodes = Nodes} = State) ->
+    Nodes1 = lists:keyreplace(Path, #group.path, Nodes, Node),
+    State1 = State#state{nodes = Nodes1},
+    update_node_status_line(Node, State1),
+    State1;
 replace_node(#suite{name = Name} = Node, #state{nodes = Nodes} = State) ->
     Nodes1 = lists:keyreplace(Name, #suite.name, Nodes, Node),
     State1 = State#state{nodes = Nodes1},
