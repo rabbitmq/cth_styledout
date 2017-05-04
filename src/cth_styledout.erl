@@ -904,7 +904,7 @@ update_group_status_line(#group{name = Name, line = Line} = Group,
     end,
     Indent = node_indent(Group),
     Color = "",
-    io:format("~s~s* ~s[~s]\e[0m\e[K~n\e[K~s",
+    io:format("~s~s* ~s[~s]\e[0m\e[K~n~s",
               [CursorUp, Indent, Color, Name, CursorDown]).
 
 update_test_status_line(
