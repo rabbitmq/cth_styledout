@@ -292,7 +292,7 @@ handle_cast({post_end_per_suite, SuiteName, _Config, Return, Timestamp},
     show_suite_summary(Suite1, State1),
     {noreply, State1};
 
-handle_cast({pre_init_per_group, GroupName, Config, _}, State)
+handle_cast({pre_init_per_group, GroupName, Config, Timestamp}, State)
   when is_list(Config) ->
     {TotalRuns, GroupPath} = compute_group_path(GroupName, Config, State),
     State1 = case does_node_exist(#group{path = GroupPath}, State) of
@@ -300,7 +300,8 @@ handle_cast({pre_init_per_group, GroupName, Config, _}, State)
                      Group = #group{
                                 path = GroupPath,
                                 name = GroupName,
-                                total_runs = TotalRuns
+                                total_runs = TotalRuns,
+                                pre_init_time = Timestamp
                                },
                      insert_node(Group, State);
                  true ->
