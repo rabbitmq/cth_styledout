@@ -312,16 +312,25 @@ handle_cast({pre_init_per_group, GroupName, Config, Timestamp}, State)
 handle_cast({post_init_per_group, GroupName, Config, Return, Timestamp},
             State) ->
     {_, GroupPath} = compute_group_path(GroupName, Config, State),
-    Group = get_node(GroupPath, State),
-    Group1 = Group#group{
-               init_end_return = case return_to_result(Return) of
-                                     success -> undefined;
-                                     _       -> Return
-                                 end,
-               post_init_time = Timestamp
-              },
-    State1 = replace_node(Group1, State),
-    {noreply, State1};
+    case get_node(GroupPath, State) of
+        false ->
+            %% Sometimes post_init_per_group() is called without
+            %% pre_init_per_group() called first, thus the group doesn't
+            %% exist. For instance, it happens when a testcase in the
+            %% previous sibling group failed. Perhaps cth_fail_fast need
+            %% to be enabled too.
+            {noreply, State};
+        Group ->
+            Group1 = Group#group{
+                       init_end_return = case return_to_result(Return) of
+                                             success -> undefined;
+                                             _       -> Return
+                                         end,
+                       post_init_time = Timestamp
+                      },
+            State1 = replace_node(Group1, State),
+            {noreply, State1}
+    end;
 
 handle_cast({pre_end_per_group, GroupName, Config, Timestamp}, State) ->
     {_, GroupPath} = compute_group_path(GroupName, Config, State),
