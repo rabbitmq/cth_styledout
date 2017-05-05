@@ -384,7 +384,10 @@ handle_cast({post_init_per_testcase, TestcaseName, Config, Return, Timestamp},
                               TestcaseName, Config, State),
     Test = get_node(TestPath, State),
     Run = lists:keyfind(RunIdx, #run.index, Test#test.runs),
-    Result = return_to_result(Return),
+    Result = case return_to_result(Return) of
+                 success -> undefined;
+                 R       -> R
+             end,
     Run1 = Run#run{
              result = Result,
              return = case Result of
