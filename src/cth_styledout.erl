@@ -875,11 +875,12 @@ test_runs_duration_avg(Runs) ->
             format_duration(Duration)
     end.
 
-return_to_result({'EXIT', _}) -> failure;
-return_to_result({error, _})  -> failure;
-return_to_result({failed, _}) -> failure;
-return_to_result({skip, _})   -> skipped;
-return_to_result(_)           -> success.
+return_to_result({'EXIT', _})           -> failure;
+return_to_result({error, _})            -> failure;
+return_to_result({failed, _})           -> failure;
+return_to_result({timetrap_timeout, _}) -> failure;
+return_to_result({skip, _})             -> skipped;
+return_to_result(_)                     -> success.
 
 result_to_color(success)   -> "\e[32m";
 result_to_color(skipped)   -> "\e[1;33m";
