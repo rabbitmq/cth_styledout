@@ -27,6 +27,8 @@
 
 -include_lib("common_test/include/ct.hrl").
 
+-define(RESULT_IS_FAILURE(R), (R =:= failure orelse R =:= skipped)).
+
 %% gen_server callbacks.
 -export(
    [
@@ -1005,7 +1007,8 @@ show_errors([#group{init_end_return = Return} = Group | Rest])
     Color = result_to_color(return_to_result(Return)),
     io:format("~n~s~s\e[0m~n    ~p~n", [Color, Label, Return]),
     show_errors(Rest);
-show_errors([#test{result = Result} = Test | Rest]) when Result =/= success ->
+show_errors([#test{result = Result} = Test | Rest])
+  when ?RESULT_IS_FAILURE(Result) ->
     show_run_errors(Test),
     show_errors(Rest);
 show_errors([_ | Rest]) ->
@@ -1021,7 +1024,7 @@ show_run_errors(#test{runs = Runs, result = Result} = Test) ->
 
 show_run_errors1(
   [#run{result = Result, return = Return} | Rest], Displayed)
-  when Result =/= success ->
+  when ?RESULT_IS_FAILURE(Result) ->
     case lists:member(Return, Displayed) of
         false ->
             io:format("    #~b. ~p~n", [length(Displayed) + 1, Return]),
