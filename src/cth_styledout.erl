@@ -259,16 +259,24 @@ handle_cast({pre_init_per_suite, SuiteName, Config, Timestamp}, State)
 
 handle_cast({post_init_per_suite, SuiteName, _Config, Return, Timestamp},
             State) ->
-    Suite = get_node(SuiteName, State),
-    Suite1 = Suite#suite{
-               init_end_return = case return_to_result(Return) of
-                                     success -> undefined;
-                                     _       -> Return
-                                 end,
-               post_init_time = Timestamp
-              },
-    State1 = replace_node(Suite1, State),
-    {noreply, State1};
+    case get_node(SuiteName, State) of
+        false ->
+            %% Sometimes post_init_per_suite() is called without
+            %% pre_init_per_suite() called first, thus the suite doesn't
+            %% exist. See post_init_per_group() for a possible situation
+            %% where this happens.
+            {noreply, State};
+        Suite ->
+            Suite1 = Suite#suite{
+                       init_end_return = case return_to_result(Return) of
+                                             success -> undefined;
+                                             _       -> Return
+                                         end,
+                       post_init_time = Timestamp
+                      },
+            State1 = replace_node(Suite1, State),
+            {noreply, State1}
+    end;
 
 handle_cast({pre_end_per_suite, SuiteName, _Config, Timestamp}, State) ->
     Suite = get_node(SuiteName, State),
