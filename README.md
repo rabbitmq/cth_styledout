@@ -8,7 +8,7 @@ stdout with a more concise and colored output.
 To use it with ct_run(1):
 
 ```
-ct_run -ct_books cth_styledout
+ct_run -ct_hooks cth_styledout
 ```
 
 To use it with Erlang.mk:
