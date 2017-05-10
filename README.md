@@ -11,8 +11,11 @@ To use it with ct_run(1):
 ct_run -ct_hooks cth_styledout
 ```
 
-To use it with Erlang.mk:
+To use it with Erlang.mk, put the following in your `Makefile`:
 
-```
-make CT_OPTS='-ct_hooks cth_styledout'
+```make
+dep_cth_styledout = git https://github.com/rabbitmq/cth_styledout.git master
+TEST_DEPS += cth_styledout
+
+CT_OPTS += '-ct_hooks cth_styledout'
 ```
