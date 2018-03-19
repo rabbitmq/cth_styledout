@@ -553,7 +553,11 @@ compute_group_path(GroupName, Config, State) ->
 
 compute_test_run_path(TestcaseName, Config, State) ->
     ConfigPath = ?config(tc_group_path, Config),
-    ConfigProps = ?config(tc_group_properties, Config),
+    ConfigProps = lists:filter(
+                    fun
+                        ({suite, _}) -> false;
+                        (_)          -> true
+                    end, ?config(tc_group_properties, Config)),
     ParentPath0 = format_test_components([ConfigProps | ConfigPath]),
     ParentPath = fix_path(ParentPath0, State),
     Path = [TestcaseName | ParentPath],
