@@ -698,7 +698,10 @@ insert_as_last_child_of_parent(Node, NodePath, #state{nodes = Nodes} = State) ->
                      PreviousNode = hd(Nodes1),
                      Node1 = set_line_based_on_previous(
                                Node, PreviousNode),
-                     [Node1 | Nodes1]
+                     [Node1 | Nodes1];
+                 searching ->
+                     exit({insert_as_last_child_of_parent_failed,
+                           Node, NodePath, Nodes, Nodes1})
              end,
     Nodes3 = lists:reverse(Nodes2),
     State1 = State#state{nodes = Nodes3},
