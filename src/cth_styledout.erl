@@ -344,26 +344,34 @@ handle_cast({post_init_per_group, GroupName, Config, Return, Timestamp},
 
 handle_cast({pre_end_per_group, GroupName, Config, Timestamp}, State) ->
     {_, GroupPath} = compute_group_path(GroupName, Config, State),
-    Group = get_node(GroupPath, State),
-    Group1 = Group#group{
-               pre_end_time = Timestamp
-              },
-    State1 = replace_node(Group1, State),
-    {noreply, State1};
+    case get_node(GroupPath, State) of
+        false ->
+            {noreply, State};
+        Group ->
+            Group1 = Group#group{
+                       pre_end_time = Timestamp
+                      },
+            State1 = replace_node(Group1, State),
+            {noreply, State1}
+    end;
 
 handle_cast({post_end_per_group, GroupName, Config, Return, Timestamp},
             State) ->
     {_, GroupPath} = compute_group_path(GroupName, Config, State),
-    Group = get_node(GroupPath, State),
-    Group1 = Group#group{
-               init_end_return = case return_to_result(Return) of
-                                     success -> undefined;
-                                     _       -> Return
-                                 end,
-               post_end_time = Timestamp
-              },
-    State1 = replace_node(Group1, State),
-    {noreply, State1};
+    case get_node(GroupPath, State) of
+        false ->
+            {noreply, State};
+        Group ->
+            Group1 = Group#group{
+                       init_end_return = case return_to_result(Return) of
+                                             success -> undefined;
+                                             _       -> Return
+                                         end,
+                       post_end_time = Timestamp
+                      },
+            State1 = replace_node(Group1, State),
+            {noreply, State1}
+    end;
 
 handle_cast({pre_init_per_testcase, TestcaseName, Config, Timestamp}, State)
   when is_list(Config) ->
