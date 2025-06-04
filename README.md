@@ -17,5 +17,5 @@ To use it with Erlang.mk, put the following in your `Makefile`:
 dep_cth_styledout = git https://github.com/rabbitmq/cth_styledout.git master
 TEST_DEPS += cth_styledout
 
-CT_OPTS += '-ct_hooks cth_styledout'
+CT_OPTS += -ct_hooks cth_styledout
 ```
